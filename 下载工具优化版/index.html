@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>yt-dlp 下载工具</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f2f1ed;--surface:#fff;--surface2:#f2f1ed;--surface3:#e8e7e2;
+  --border:rgba(0,0,0,0.09);--border2:rgba(0,0,0,0.16);
+  --text:#18180f;--text2:#6b6a63;--text3:#a09f98;
+  --accent:#18180f;--accent-fg:#f2f1ed;
+  --green:#1a7a52;--green-bg:#e6f4ed;--green-text:#0f5c3b;
+  --red:#b83232;--red-bg:#fceaea;--red-text:#8a2020;
+  --amber:#8a5c0a;--amber-bg:#fef5e4;--amber-text:#6b4608;
+  --blue:#1a5fa8;--blue-bg:#e8f0fb;--blue-text:#144a85;
+  --mono:'SF Mono','Fira Code',monospace;
+  --r:9px;--r-lg:13px;
+}
+@media(prefers-color-scheme:dark){
+  :root{
+    --bg:#131310;--surface:#1e1e1b;--surface2:#262623;--surface3:#2e2e2a;
+    --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
+    --text:#e6e5de;--text2:#8a8980;--text3:#55544e;
+    --accent:#e6e5de;--accent-fg:#131310;
+    --green:#4dc995;--green-bg:rgba(26,122,82,0.18);--green-text:#4dc995;
+    --red:#e88080;--red-bg:rgba(184,50,50,0.18);--red-text:#e88080;
+    --amber:#e0a030;--amber-bg:rgba(138,92,10,0.2);--amber-text:#e0a030;
+    --blue:#6aaae8;--blue-bg:rgba(26,95,168,0.2);--blue-text:#6aaae8;
+  }
+}
+body{font-family:-apple-system,'Helvetica Neue',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.5}
+.layout{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
+.sidebar{background:var(--surface);border-right:0.5px solid var(--border);padding:1.25rem 1rem;display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:100vh;overflow-y:auto}
+.sidebar-logo{font-size:15px;font-weight:600;letter-spacing:-0.3px;padding:0 6px;margin-bottom:12px;color:var(--text)}
+.sidebar-logo span{color:var(--text3);font-weight:400}
+.nav-item{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:var(--r);font-size:13px;color:var(--text2);cursor:pointer;transition:background 0.12s,color 0.12s;user-select:none}
+.nav-item:hover{background:var(--surface2);color:var(--text)}
+.nav-item.active{background:var(--surface3);color:var(--text);font-weight:500}
+.nav-icon{width:16px;height:16px;flex-shrink:0;opacity:0.7}
+.nav-badge{margin-left:auto;background:var(--surface3);color:var(--text3);font-size:11px;font-weight:500;padding:1px 6px;border-radius:10px}
+.nav-badge.active-count{background:var(--amber-bg);color:var(--amber-text)}
+.sidebar-section{font-size:11px;font-weight:600;letter-spacing:0.07em;text-transform:uppercase;color:var(--text3);padding:14px 10px 5px}
+.main{padding:2rem;overflow-y:auto}
+.page{display:none}.page.active{display:block}
+.page-title{font-size:20px;font-weight:600;letter-spacing:-0.4px;margin-bottom:1.5rem}
+
+/* cards */
+.card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r-lg);padding:1.25rem;margin-bottom:1rem}
+.card-title{font-size:11px;font-weight:600;letter-spacing:0.07em;text-transform:uppercase;color:var(--text3);margin-bottom:12px}
+
+/* form elements */
+label{font-size:12px;color:var(--text2);display:block;margin-bottom:4px;margin-top:10px}
+label:first-of-type{margin-top:0}
+textarea,input[type=text],select{width:100%;background:var(--surface2);border:0.5px solid var(--border);border-radius:var(--r);color:var(--text);font-size:13px;outline:none;transition:border-color 0.12s}
+textarea:focus,input[type=text]:focus,select:focus{border-color:var(--border2)}
+textarea{padding:10px 12px;font-family:var(--mono);font-size:11.5px;line-height:1.6;resize:vertical}
+input[type=text]{height:34px;padding:0 10px}
+select{height:34px;padding:0 28px 0 10px;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='%239e9d97' d='M1 3l4 4 4-4z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 9px center;cursor:pointer}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+
+/* buttons */
+.btn{height:34px;padding:0 14px;border-radius:var(--r);font-size:13px;cursor:pointer;transition:opacity 0.12s,transform 0.1s;white-space:nowrap}
+.btn:active{transform:scale(0.98)}
+.btn-primary{background:var(--accent);color:var(--accent-fg);border:none;font-weight:500}
+.btn-primary:hover{opacity:0.85}
+.btn-primary:disabled{opacity:0.35;cursor:not-allowed;transform:none}
+.btn-outline{background:transparent;border:0.5px solid var(--border2);color:var(--text2)}
+.btn-outline:hover{background:var(--surface2);color:var(--text)}
+.btn-danger{background:transparent;border:0.5px solid var(--red);color:var(--red)}
+.btn-danger:hover{background:var(--red-bg)}
+.btn-full{width:100%;margin-top:12px}
+
+/* server status */
+.srv-bar{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text2);padding:8px 10px;background:var(--surface2);border-radius:var(--r);margin-bottom:1.25rem}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--text3);flex-shrink:0}
+.dot.on{background:var(--green)}.dot.off{background:var(--red)}
+
+/* queue list */
+.queue-item{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r-lg);padding:1rem 1.1rem;margin-bottom:8px;transition:border-color 0.15s}
+.queue-item.running{border-color:var(--amber)}
+.queue-item.done{border-color:var(--green)}
+.queue-item.error{border-color:var(--red)}
+.qi-header{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.qi-name{font-size:13px;font-weight:500;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qi-actions{display:flex;gap:6px;flex-shrink:0}
+.qi-path{font-family:var(--mono);font-size:11px;color:var(--text3);margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qi-meta{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text3);margin-bottom:6px}
+.prog-wrap{height:3px;background:var(--surface3);border-radius:2px;overflow:hidden}
+.prog-bar{height:100%;background:var(--green);border-radius:2px;transition:width 0.5s ease}
+.prog-bar.running{background:var(--amber)}
+.prog-bar.error{background:var(--red)}
+.prog-bar.ind{width:35%;animation:ind 1.3s infinite ease-in-out}
+@keyframes ind{0%{transform:translateX(-100%)}100%{transform:translateX(400%)}}
+.log-toggle{font-size:11px;color:var(--text3);cursor:pointer;margin-top:6px;user-select:none}
+.log-toggle:hover{color:var(--text2)}
+.log-box{background:var(--surface2);border:0.5px solid var(--border);border-radius:var(--r);padding:8px 10px;font-family:var(--mono);font-size:10.5px;line-height:1.7;color:var(--text2);max-height:180px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;margin-top:6px;display:none}
+
+/* badge */
+.badge{display:inline-flex;align-items:center;font-size:11px;font-weight:500;padding:2px 8px;border-radius:20px;white-space:nowrap}
+.badge.pending{background:var(--surface3);color:var(--text3)}
+.badge.running{background:var(--amber-bg);color:var(--amber-text)}
+.badge.paused{background:var(--blue-bg);color:var(--blue-text)}
+.badge.done{background:var(--green-bg);color:var(--green-text)}
+.badge.error{background:var(--red-bg);color:var(--red-text)}
+.badge.cancelled{background:var(--surface3);color:var(--text3)}
+
+/* history */
+.history-item{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:0.5px solid var(--border)}
+.history-item:last-child{border-bottom:none}
+.hi-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:14px}
+.hi-icon.done{background:var(--green-bg)}
+.hi-icon.error{background:var(--red-bg)}
+.hi-info{flex:1;overflow:hidden}
+.hi-name{font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hi-path{font-size:11px;color:var(--text3);font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hi-time{font-size:11px;color:var(--text3);flex-shrink:0}
+
+/* batch parse table */
+.parse-table{width:100%;border-collapse:collapse;font-size:13px}
+.parse-table th{text-align:left;font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:var(--text3);padding:6px 8px;border-bottom:0.5px solid var(--border)}
+.parse-table td{padding:8px;border-bottom:0.5px solid var(--border);vertical-align:middle}
+.parse-table tr:last-child td{border-bottom:none}
+.parse-table input{height:30px;font-size:12px}
+.parse-table .url-cell{font-family:var(--mono);font-size:10.5px;color:var(--text3);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.parse-ok{color:var(--green);font-size:12px}
+.parse-err{color:var(--red);font-size:12px}
+.remove-row{background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:0 4px;line-height:1}
+.remove-row:hover{color:var(--red)}
+.empty-state{text-align:center;padding:3rem 0;color:var(--text3);font-size:13px}
+</style>
+</head>
+<body>
+<div class="layout">
+
+<!-- sidebar -->
+<aside class="sidebar">
+  <div class="sidebar-logo">yt-dlp <span>下载工具</span></div>
+  <div class="nav-item active" data-page="add" onclick="showPage('add',this)">
+    <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/><line x1="8" y1="5" x2="8" y2="11"/><line x1="5" y1="8" x2="11" y2="8"/></svg>
+    添加下载
+  </div>
+  <div class="nav-item" data-page="queue" onclick="showPage('queue',this)">
+    <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="2.5" rx="1"/><rect x="2" y="7" width="12" height="2.5" rx="1"/><rect x="2" y="11" width="8" height="2.5" rx="1"/></svg>
+    下载队列
+    <span class="nav-badge" id="queue-badge">0</span>
+  </div>
+  <div class="nav-item" data-page="history" onclick="showPage('history',this)">
+    <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/><polyline points="8,4.5 8,8 10.5,10"/></svg>
+    下载历史
+  </div>
+  <div style="flex:1"></div>
+  <div class="srv-bar" style="margin-bottom:0">
+    <span class="dot" id="srv-dot"></span>
+    <span id="srv-txt" style="font-size:11px">连接中...</span>
+  </div>
+</aside>
+
+<!-- main -->
+<main class="main">
+
+  <!-- ADD PAGE -->
+  <div class="page active" id="page-add">
+    <div class="page-title">添加下载</div>
+
+    <div class="card">
+      <div class="card-title">粘贴 cURL 命令</div>
+      <textarea id="curl-input" rows="8" placeholder="支持批量：每行一个 cURL 命令，或粘贴多行 cURL（含反斜杠换行）&#10;&#10;从 Safari 开发者工具：找到 playlist.m3u8 → 右键 → 拷贝为 cURL"></textarea>
+      <button class="btn btn-outline" style="margin-top:8px;font-size:12px" onclick="parseBatch()">解析 cURL</button>
+    </div>
+
+    <!-- batch table -->
+    <div class="card" id="batch-card" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div class="card-title" style="margin-bottom:0">解析结果 — 填写文件名</div>
+        <button class="btn btn-outline" style="font-size:12px;height:28px;padding:0 10px" onclick="addMoreRows()">+ 手动添加</button>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="parse-table">
+          <thead><tr>
+            <th style="width:32px"></th>
+            <th>URL 预览</th>
+            <th style="width:200px">文件名（不含扩展名）</th>
+            <th style="width:40px"></th>
+          </tr></thead>
+          <tbody id="batch-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">下载设置</div>
+      <div class="row3">
+        <div>
+          <label>保存文件夹</label>
+          <div style="display:flex;gap:6px">
+            <input type="text" id="folder" value="~/Desktop" placeholder="~/Desktop/Courses" style="flex:1;min-width:0"/>
+            <button class="btn btn-outline" id="pick-btn" onclick="pickFolder()" style="flex-shrink:0;padding:0 10px;font-size:12px">选择…</button>
+          </div>
+        </div>
+        <div>
+          <label>画质</label>
+          <select id="quality">
+            <option value="bestvideo+bestaudio/best">最高（自动）</option>
+            <option value="bestvideo[height<=1080]+bestaudio/best[height<=1080]">1080P</option>
+            <option value="bestvideo[height<=720]+bestaudio/best[height<=720]">720P</option>
+            <option value="bestvideo[height<=480]+bestaudio/best[height<=480]">480P</option>
+          </select>
+        </div>
+        <div>
+          <label>并发线程数</label>
+          <select id="threads">
+            <option value="2">2 线程</option>
+            <option value="4">4 线程</option>
+            <option value="8">8 线程</option>
+            <option value="16" selected>16 线程</option>
+            <option value="32">32 线程</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn btn-primary btn-full" id="start-btn" onclick="startAll()">开始下载</button>
+  </div>
+
+  <!-- QUEUE PAGE -->
+  <div class="page" id="page-queue">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem">
+      <div class="page-title" style="margin-bottom:0">下载队列</div>
+      <button class="btn btn-outline" style="font-size:12px" onclick="clearDone()">清除已完成</button>
+    </div>
+    <div id="queue-list"><div class="empty-state">暂无下载任务</div></div>
+  </div>
+
+  <!-- HISTORY PAGE -->
+  <div class="page" id="page-history">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem">
+      <div class="page-title" style="margin-bottom:0">下载历史</div>
+      <button class="btn btn-danger" style="font-size:12px" onclick="clearHistory()">清空历史</button>
+    </div>
+    <div class="card" id="history-list"><div class="empty-state">暂无记录</div></div>
+  </div>
+
+</main>
+</div>
+
+<script>
+const API = "http://127.0.0.1:57821";
+let batchRows = [];       // [{url, curl, nameInput}]
+let activeJobs = {};      // job_id -> {meta, poll timer, lineCount}
+let logVisible = {};      // job_id -> bool
+
+// ── nav ────────────────────────────────────────────────────────────────────
+function showPage(name, el) {
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+  document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
+  document.getElementById("page-" + name).classList.add("active");
+  el.classList.add("active");
+  if (name === "queue") renderQueue();
+  if (name === "history") renderHistory();
+}
+
+// ── server check ──────────────────────────────────────────────────────────
+async function checkServer() {
+  try {
+    const r = await fetch(API + "/check", { signal: AbortSignal.timeout(2000) });
+    const d = await r.json();
+    document.getElementById("srv-dot").className = "dot on";
+    document.getElementById("srv-txt").textContent = "服务就绪";
+  } catch {
+    document.getElementById("srv-dot").className = "dot off";
+    document.getElementById("srv-txt").textContent = "服务未启动";
+    setTimeout(checkServer, 3000);
+  }
+}
+
+// ── curl batch parse ──────────────────────────────────────────────────────
+function splitCurls(raw) {
+  const joined = raw.replace(/\\\n/g, " ");
+  // Split on curl keyword, but also treat the whole thing as one block if no "curl" found
+  const chunks = joined.split(/(?=\bcurl\s+['"]?https?)/);
+  const result = chunks.map(s => s.trim()).filter(Boolean);
+  // If nothing was split (e.g. pasted without "curl 'url'" prefix), treat as one block
+  return result.length ? result : [joined.trim()];
+}
+
+function extractUrl(raw) {
+  // Try standard curl url position first
+  const m = raw.match(/curl\s+['"]?(https?:\/\/[^\s'"\\]+)['"]?/)
+         || raw.match(/['"](https?:\/\/[^\s'"\\]+)['"]/);
+  return m ? m[1] : null;
+}
+
+function parseBatch() {
+  const raw = document.getElementById("curl-input").value.trim();
+  if (!raw) return;
+  const curls = splitCurls(raw);
+  batchRows = curls.map((c, i) => ({ curl: c, url: extractUrl(c), idx: i }));
+  renderBatchTable();
+  document.getElementById("batch-card").style.display = "block";
+}
+
+function renderBatchTable() {
+  const tbody = document.getElementById("batch-tbody");
+  tbody.innerHTML = "";
+  batchRows.forEach((row, i) => {
+    const tr = document.createElement("tr");
+    const ok = !!row.url;
+    const urlCell = ok
+      ? `<span class="url-cell parse-ok" title="${row.url}">${row.url.replace(/^https?:\/\//, "").slice(0, 50)}…</span>`
+      : `<input type="text" placeholder="请粘贴 m3u8 地址（https://...m3u8）" id="url-${i}"
+           style="font-size:11.5px;font-family:var(--mono);flex:1;min-width:0"
+           oninput="batchRows[${i}].url=this.value;batchRows[${i}].curl=patchCurlUrl(batchRows[${i}].curl,this.value)"/>`;
+    tr.innerHTML = `
+      <td><span class="${ok ? "parse-ok" : "parse-err"}">${ok ? "✓" : "!"}</span></td>
+      <td style="min-width:200px">${urlCell}</td>
+      <td><input type="text" placeholder="lesson_${String(i+1).padStart(2,"0")}" id="name-${i}" value="${row.name || ""}"/></td>
+      <td><button class="remove-row" onclick="removeRow(${i})">×</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// Inject the URL into a curl block that's missing it
+function patchCurlUrl(curlRaw, url) {
+  if (!curlRaw.trim().startsWith("curl")) {
+    return `curl '${url}' \\\n${curlRaw}`;
+  }
+  return curlRaw;
+}
+
+function removeRow(i) {
+  batchRows.splice(i, 1);
+  batchRows.forEach((r, idx) => r.idx = idx);
+  renderBatchTable();
+  if (batchRows.length === 0) document.getElementById("batch-card").style.display = "none";
+}
+
+function addMoreRows() {
+  batchRows.push({ curl: "", url: null, idx: batchRows.length });
+  document.getElementById("batch-card").style.display = "block";
+  renderBatchTable();
+}
+
+// ── start downloads ───────────────────────────────────────────────────────
+async function startAll() {
+  const folder  = document.getElementById("folder").value.trim() || "~/Desktop";
+  const quality = document.getElementById("quality").value;
+  const threads = document.getElementById("threads").value;
+
+  // 如果还没解析，先解析
+  if (batchRows.length === 0) {
+    const curl = document.getElementById("curl-input").value.trim();
+    if (!curl) { alert("请先粘贴 cURL 命令"); return; }
+    parseBatch();
+  }
+
+  if (batchRows.length === 0) { alert("请先粘贴 cURL 命令"); return; }
+
+  const toDownload = batchRows.map((row, i) => {
+    const nameEl = document.getElementById(`name-${i}`);
+    return {
+      curl: row.curl,
+      filename: (nameEl ? nameEl.value.trim() : "") || `video_${String(i+1).padStart(2,"0")}`,
+      valid: !!row.url,
+    };
+  }).filter(r => r.valid);
+
+  if (toDownload.length === 0) {
+    alert("没有可以下载的有效链接。\n\n如果 cURL 缺少 URL，请在解析结果表格的「URL 预览」列手动填入 m3u8 地址。");
+    return;
+  }
+
+  const btn = document.getElementById("start-btn");
+  btn.disabled = true;
+  btn.textContent = "提交中…";
+
+  try {
+    for (const item of toDownload) {
+      try {
+        const r = await fetch(API + "/download", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ curl: item.curl, folder, filename: item.filename, quality, threads: parseInt(threads) }),
+        });
+        const d = await r.json();
+        if (d.job_id) {
+          activeJobs[d.job_id] = { filename: item.filename, output: d.output, lineCount: 0 };
+          startPoll(d.job_id);
+        }
+      } catch (e) {
+        console.error("Failed to start:", item.filename, e);
+      }
+    }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "开始下载";
+  }
+
+  batchRows = [];
+  document.getElementById("curl-input").value = "";
+  document.getElementById("batch-card").style.display = "none";
+  showPage("queue", document.querySelector('[data-page="queue"]'));
+}
+
+// ── polling ───────────────────────────────────────────────────────────────
+function startPoll(job_id) {
+  poll(job_id);
+}
+
+async function poll(job_id) {
+  const meta = activeJobs[job_id];
+  if (!meta) return;
+  try {
+    const r = await fetch(`${API}/status?job_id=${job_id}&since=${meta.lineCount}`);
+    const d = await r.json();
+    meta.lineCount += d.lines.length;
+    meta.status = d.status;
+    meta.progress = d.progress;
+    meta.speed = d.speed;
+    meta.eta = d.eta;
+    meta.newLines = d.lines;
+    updateQueueItem(job_id, d);
+    updateQueueBadge();
+    if (d.status === "running" || d.status === "pending" || d.status === "paused") {
+      meta._timer = setTimeout(() => poll(job_id), 700);
+    }
+  } catch {
+    meta._timer = setTimeout(() => poll(job_id), 1500);
+  }
+}
+
+// ── queue render ──────────────────────────────────────────────────────────
+function updateQueueBadge() {
+  const active = Object.values(activeJobs).filter(j => j.status === "running" || j.status === "pending" || j.status === "paused").length;
+  const badge = document.getElementById("queue-badge");
+  badge.textContent = Object.keys(activeJobs).length;
+  badge.className = "nav-badge" + (active > 0 ? " active-count" : "");
+}
+
+function renderQueue() {
+  const el = document.getElementById("queue-list");
+  if (Object.keys(activeJobs).length === 0) {
+    el.innerHTML = '<div class="empty-state">暂无下载任务</div>';
+    return;
+  }
+  // render items that don't exist yet
+  Object.entries(activeJobs).forEach(([jid, meta]) => {
+    if (!document.getElementById("qi-" + jid)) {
+      const div = document.createElement("div");
+      div.id = "qi-" + jid;
+      div.className = "queue-item";
+      div.innerHTML = buildQueueItemHTML(jid, meta);
+      el.appendChild(div);
+    }
+  });
+}
+
+function buildQueueItemHTML(jid, meta) {
+  const s = meta.status || "pending";
+  const pct = Math.round(meta.progress || 0);
+  const barClass = ["running","pending"].includes(s) ? "running" : s === "error" ? "error" : "";
+  const indClass = s === "pending" ? "ind" : "";
+  return `
+    <div class="qi-header">
+      <span class="qi-name">${meta.filename}.mp4</span>
+      <div class="qi-actions" id="qi-actions-${jid}"></div>
+      <span class="badge ${s}" id="qi-badge-${jid}">${statusLabel(s)}</span>
+    </div>
+    <div class="qi-path">${meta.output || ""}</div>
+    <div class="qi-meta">
+      <span id="qi-pct-${jid}">${pct}%</span>
+      <span id="qi-speed-${jid}">${meta.speed || ""}</span>
+      <span id="qi-eta-${jid}">${meta.eta ? "ETA " + meta.eta : ""}</span>
+    </div>
+    <div class="prog-wrap"><div class="prog-bar ${barClass} ${indClass}" id="qi-bar-${jid}" style="width:${pct}%"></div></div>
+    <div class="log-toggle" onclick="toggleLog('${jid}')">▸ 显示日志</div>
+    <div class="log-box" id="qi-log-${jid}"></div>
+  `;
+}
+
+function updateQueueItem(jid, d) {
+  const meta = activeJobs[jid];
+  // create card if needed
+  const el = document.getElementById("queue-list");
+  if (el.querySelector(".empty-state")) el.innerHTML = "";
+  if (!document.getElementById("qi-" + jid)) {
+    const div = document.createElement("div");
+    div.id = "qi-" + jid;
+    div.className = "queue-item";
+    div.innerHTML = buildQueueItemHTML(jid, meta);
+    el.appendChild(div);
+    renderActions(jid, d.status);
+  }
+
+  const s = d.status;
+  const pct = Math.round(d.progress || 0);
+
+  // update badge
+  const badge = document.getElementById("qi-badge-" + jid);
+  if (badge) { badge.className = "badge " + s; badge.textContent = statusLabel(s); }
+
+  // update card border
+  const card = document.getElementById("qi-" + jid);
+  if (card) card.className = "queue-item " + (["running","paused"].includes(s) ? "running" : s === "done" ? "done" : s === "error" ? "error" : "");
+
+  // update progress
+  const bar = document.getElementById("qi-bar-" + jid);
+  if (bar) {
+    bar.className = "prog-bar" + (["running","pending"].includes(s) ? " running" : s === "error" ? " error" : "") + (s === "pending" ? " ind" : "");
+    bar.style.width = pct + "%";
+  }
+  const pctEl = document.getElementById("qi-pct-" + jid);
+  if (pctEl) pctEl.textContent = pct + "%";
+  const speedEl = document.getElementById("qi-speed-" + jid);
+  if (speedEl) speedEl.textContent = d.speed || "";
+  const etaEl = document.getElementById("qi-eta-" + jid);
+  if (etaEl) etaEl.textContent = d.eta ? "ETA " + d.eta : "";
+
+  // append log lines
+  if (d.lines && d.lines.length > 0) {
+    const logEl = document.getElementById("qi-log-" + jid);
+    if (logEl) {
+      d.lines.forEach(l => { logEl.textContent += l + "\n"; });
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+  }
+
+  renderActions(jid, s);
+}
+
+function renderActions(jid, status) {
+  const el = document.getElementById("qi-actions-" + jid);
+  if (!el) return;
+  if (status === "running") {
+    el.innerHTML = `<button class="btn btn-outline" style="font-size:11px;height:26px;padding:0 10px" onclick="pauseJob('${jid}')">暂停</button>
+                    <button class="btn btn-danger" style="font-size:11px;height:26px;padding:0 10px" onclick="cancelJob('${jid}')">取消</button>`;
+  } else if (status === "paused") {
+    el.innerHTML = `<button class="btn btn-outline" style="font-size:11px;height:26px;padding:0 10px" onclick="resumeJob('${jid}')">继续</button>
+                    <button class="btn btn-danger" style="font-size:11px;height:26px;padding:0 10px" onclick="cancelJob('${jid}')">取消</button>`;
+  } else {
+    el.innerHTML = `<button class="btn btn-outline" style="font-size:11px;height:26px;padding:0 10px" onclick="removeJob('${jid}')">移除</button>`;
+  }
+}
+
+function toggleLog(jid) {
+  const el = document.getElementById("qi-log-" + jid);
+  const tog = el.previousElementSibling;
+  if (!el) return;
+  if (el.style.display === "none" || el.style.display === "") {
+    el.style.display = "block";
+    tog.textContent = "▾ 隐藏日志";
+  } else {
+    el.style.display = "none";
+    tog.textContent = "▸ 显示日志";
+  }
+}
+
+function statusLabel(s) {
+  return { pending:"等待中", running:"下载中", paused:"已暂停", done:"完成", error:"出错", cancelled:"已取消" }[s] || s;
+}
+
+async function pauseJob(jid) {
+  await fetch(API + "/pause", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({job_id:jid}) });
+  if (activeJobs[jid]) activeJobs[jid].status = "paused";
+  renderActions(jid, "paused");
+  const badge = document.getElementById("qi-badge-" + jid);
+  if (badge) { badge.className = "badge paused"; badge.textContent = "已暂停"; }
+}
+
+async function resumeJob(jid) {
+  await fetch(API + "/resume", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({job_id:jid}) });
+  if (activeJobs[jid]) activeJobs[jid].status = "running";
+  startPoll(jid);
+  renderActions(jid, "running");
+}
+
+async function cancelJob(jid) {
+  await fetch(API + "/cancel", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({job_id:jid}) });
+  if (activeJobs[jid]) { activeJobs[jid].status = "cancelled"; clearTimeout(activeJobs[jid]._timer); }
+  renderActions(jid, "cancelled");
+  const badge = document.getElementById("qi-badge-" + jid);
+  if (badge) { badge.className = "badge cancelled"; badge.textContent = "已取消"; }
+  updateQueueBadge();
+}
+
+function removeJob(jid) {
+  clearTimeout(activeJobs[jid]?._timer);
+  delete activeJobs[jid];
+  const el = document.getElementById("qi-" + jid);
+  if (el) el.remove();
+  if (Object.keys(activeJobs).length === 0)
+    document.getElementById("queue-list").innerHTML = '<div class="empty-state">暂无下载任务</div>';
+  updateQueueBadge();
+}
+
+function clearDone() {
+  Object.keys(activeJobs).forEach(jid => {
+    if (["done","error","cancelled"].includes(activeJobs[jid]?.status)) removeJob(jid);
+  });
+}
+
+// ── history ───────────────────────────────────────────────────────────────
+async function renderHistory() {
+  const el = document.getElementById("history-list");
+  try {
+    const r = await fetch(API + "/history");
+    const items = await r.json();
+    if (!items.length) { el.innerHTML = '<div class="empty-state">暂无记录</div>'; return; }
+    el.innerHTML = items.map(item => {
+      const ts = item.finished_at ? new Date(item.finished_at * 1000).toLocaleString("zh-CN", {month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}) : "";
+      const icon = item.status === "done" ? "✓" : "✗";
+      const dur = item.started_at && item.finished_at ? formatDur(item.finished_at - item.started_at) : "";
+      return `<div class="history-item">
+        <div class="hi-icon ${item.status}">${icon}</div>
+        <div class="hi-info">
+          <div class="hi-name">${item.filename || "unknown"}.mp4</div>
+          <div class="hi-path">${item.output || ""}</div>
+          ${dur ? `<div style="font-size:11px;color:var(--text3);margin-top:1px">耗时 ${dur}</div>` : ""}
+        </div>
+        <div class="hi-time">${ts}</div>
+      </div>`;
+    }).join("");
+  } catch {
+    el.innerHTML = '<div class="empty-state">无法读取历史（服务未启动）</div>';
+  }
+}
+
+function formatDur(secs) {
+  if (secs < 60) return Math.round(secs) + " 秒";
+  if (secs < 3600) return Math.round(secs/60) + " 分钟";
+  return (secs/3600).toFixed(1) + " 小时";
+}
+
+async function clearHistory() {
+  if (!confirm("确定清空所有历史记录？")) return;
+  await fetch(API + "/clear_history", { method:"POST", headers:{"Content-Type":"application/json"}, body:"{}" });
+  renderHistory();
+}
+
+// ── folder picker ─────────────────────────────────────────────────────────
+async function pickFolder() {
+  const btn = document.getElementById("pick-btn");
+  btn.textContent = "选择中…";
+  btn.disabled = true;
+  try {
+    const r = await fetch(API + "/pick_folder", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    const d = await r.json();
+    if (d.path) {
+      document.getElementById("folder").value = d.path;
+    }
+  } catch (e) {
+    alert("无法打开文件夹选择框，请确认服务正在运行");
+  } finally {
+    btn.textContent = "选择…";
+    btn.disabled = false;
+  }
+}
+
+// ── init ──────────────────────────────────────────────────────────────────
+checkServer();
+updateQueueBadge();
+</script>
+</body>
+</html>
